@@ -28,7 +28,7 @@ teachers_with_active_student = read_csv('BCFG Main File - Teachers with Students
 
 
 ###########################################
-################SECTION 1##################
+################SECTION 1 ##################
 ###########################################
 
 #renaming variables
@@ -119,9 +119,32 @@ classroom_info = hold %>%
 
 
 #9. Calculate number of teachers per classroom, create an indicator for shared classroom
+teachers_per_class = classroom_info %>% 
+  group_by(classroom_id) %>% 
+  summarise(teachers_per_class = n())
+
+classroom_info = left_join(classroom_info, teachers_per_class, by ='classroom_id')
+
+classroom_info = classroom_info %>% 
+  mutate(shared_class = ifelse(
+    classroom_info$teachers_per_class > 1, 1, 0
+  ))
+
+#10. Remove teachers with K/preK primary grade
+classroom_info = classroom_info %>% 
+  filter(`Teacher Main Grade Level` != 'K' &
+          `Teacher Main Grade Level` != 'PK')
+
+#11. Remove preK/K classrooms
+classroom_info = classroom_info %>% 
+  filter(grade_level != 'K' &
+           grade_level != 'PK')
 
 
+###########################################
+################SECTION 2 ##################
+###########################################
 
-
+#1. Create week in usage data (based on actual date)
 
 
