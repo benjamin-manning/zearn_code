@@ -100,7 +100,7 @@ classroom_info = classroom_info %>%
 #8. Remove teachers with any of the following: 
 #indicator for did not log in and had no student log in since March (c), 
 #>150 students (e), > 6 classes f) no email delivery g) remove classes in HS+
-classroom_info = hold %>% 
+classroom_info = classroom_info %>% 
   filter(no_log_or_student_since_march != 1) %>% 
   filter(no_emails_received != 1) %>% 
   filter(more_150_students != 1) %>% 
@@ -149,57 +149,61 @@ student_usage = student_usage %>%
   rename(usage_date = `Usage Date`) %>% 
   rename(classroom_id = `Classroom ID`) %>% 
   mutate(week = case_when(
-   usage_date >=  "2021-07-01" & usage_date <= "2021-07-06" ~ -11,
-   usage_date >=  "2021-07-07" & usage_date <= "2021-07-13" ~ -10,
-   usage_date >=  "2021-07-14" & usage_date <= "2021-07-20" ~ -9,
-   usage_date >=  "2021-07-21" & usage_date <= "2021-07-27" ~ -8,
-   usage_date >=  "2021-07-28" & usage_date <= "2021-08-03" ~ -7,
-   usage_date >=  "2021-08-04" & usage_date <= "2021-08-10" ~ -6,
-   usage_date >=  "2021-08-11" & usage_date <= "2021-08-17" ~ -5,
-   usage_date >=  "2021-08-18" & usage_date <= "2021-08-24" ~ -4,
-   usage_date >=  "2021-08-25" & usage_date <= "2021-08-31" ~ -3,
-   usage_date >=  "2021-09-01" & usage_date <= "2021-09-07" ~ -2,
-   usage_date >=  "2021-09-08" & usage_date <= "2021-09-14" ~ -1,
-   usage_date >=  "2021-09-15" & usage_date <= "2021-09-21" ~ 0,
-   usage_date >=  "2021-09-22" & usage_date <= "2021-09-28" ~ 1,
-   usage_date >=  "2021-09-29" & usage_date <= "2021-10-05" ~ 2,
-   usage_date >=  "2021-10-06" & usage_date <= "2021-10-12" ~ 3,
-   usage_date >=  "2021-10-13" ~ 4,
+   usage_date >=  "2021-07-14" & usage_date <= "2021-07-20" ~ -8,
+   usage_date >=  "2021-07-21" & usage_date <= "2021-07-27" ~ -7,
+   usage_date >=  "2021-07-28" & usage_date <= "2021-08-03" ~ -6,
+   usage_date >=  "2021-08-04" & usage_date <= "2021-08-10" ~ -5,
+   usage_date >=  "2021-08-11" & usage_date <= "2021-08-17" ~ -4,
+   usage_date >=  "2021-08-18" & usage_date <= "2021-08-24" ~ -3,
+   usage_date >=  "2021-08-25" & usage_date <= "2021-08-31" ~ -2,
+   usage_date >=  "2021-09-01" & usage_date <= "2021-09-07" ~ -1,
+   usage_date >=  "2021-09-08" & usage_date <= "2021-09-14" ~ 0,
+   usage_date >=  "2021-09-15" & usage_date <= "2021-09-21" ~ 1,
+   usage_date >=  "2021-09-22" & usage_date <= "2021-09-28" ~ 2,
+   usage_date >=  "2021-09-29" & usage_date <= "2021-10-05" ~ 3,
+   usage_date >=  "2021-10-06" & usage_date <= "2021-10-12" ~ 4
    
   )
   )
 
 #2. Create week in teacher data (-8 to 4 for each teacher)
+#joining teacher sessions with classroom
 teacher_sessions = teacher_sessions %>% 
   rename(usage_date = `Usage Date`) %>% 
-  rename(teacher_id = `User ID (Pseudonymized)`) %>%
+  rename(teacher_id = `User ID (Pseudonymized)`)
+
+classroom_info = left_join(teacher_sessions, classroom_info, by = 'teacher_id')
+
+classroom_info = classroom_info %>% 
   mutate(week = case_when(
-    usage_date >=  "2021-07-01" & usage_date <= "2021-07-06" ~ -11,
-    usage_date >=  "2021-07-07" & usage_date <= "2021-07-13" ~ -10,
-    usage_date >=  "2021-07-14" & usage_date <= "2021-07-20" ~ -9,
-    usage_date >=  "2021-07-21" & usage_date <= "2021-07-27" ~ -8,
-    usage_date >=  "2021-07-28" & usage_date <= "2021-08-03" ~ -7,
-    usage_date >=  "2021-08-04" & usage_date <= "2021-08-10" ~ -6,
-    usage_date >=  "2021-08-11" & usage_date <= "2021-08-17" ~ -5,
-    usage_date >=  "2021-08-18" & usage_date <= "2021-08-24" ~ -4,
-    usage_date >=  "2021-08-25" & usage_date <= "2021-08-31" ~ -3,
-    usage_date >=  "2021-09-01" & usage_date <= "2021-09-07" ~ -2,
-    usage_date >=  "2021-09-08" & usage_date <= "2021-09-14" ~ -1,
-    usage_date >=  "2021-09-15" & usage_date <= "2021-09-21" ~ 0,
-    usage_date >=  "2021-09-22" & usage_date <= "2021-09-28" ~ 1,
-    usage_date >=  "2021-09-29" & usage_date <= "2021-10-05" ~ 2,
-    usage_date >=  "2021-10-06" & usage_date <= "2021-10-12" ~ 3,
-    usage_date >=  "2021-10-13" ~ 4,
+    usage_date >=  "2021-07-14" & usage_date <= "2021-07-20" ~ -8,
+    usage_date >=  "2021-07-21" & usage_date <= "2021-07-27" ~ -7,
+    usage_date >=  "2021-07-28" & usage_date <= "2021-08-03" ~ -6,
+    usage_date >=  "2021-08-04" & usage_date <= "2021-08-10" ~ -5,
+    usage_date >=  "2021-08-11" & usage_date <= "2021-08-17" ~ -4,
+    usage_date >=  "2021-08-18" & usage_date <= "2021-08-24" ~ -3,
+    usage_date >=  "2021-08-25" & usage_date <= "2021-08-31" ~ -2,
+    usage_date >=  "2021-09-01" & usage_date <= "2021-09-07" ~ -1,
+    usage_date >=  "2021-09-08" & usage_date <= "2021-09-14" ~ 0,
+    usage_date >=  "2021-09-15" & usage_date <= "2021-09-21" ~ 1,
+    usage_date >=  "2021-09-22" & usage_date <= "2021-09-28" ~ 2,
+    usage_date >=  "2021-09-29" & usage_date <= "2021-10-05" ~ 3,
+    usage_date >=  "2021-10-06" & usage_date <= "2021-10-12" ~ 4
     
   )
   )
 
+#getting rid of useless rows
+classroom_info = classroom_info %>% 
+  filter(!is.na(classroom_id))
+
 #3. Merge usage data into teacher data by class ID and week (Data now at the CLASSROOM-DAY Level)
 #merging student usage and classroom info
-usage_classroom = merge(student_usage, classroom_info, by = 'classroom_id')
 
-usage_classroom = merge(usage_classroom, teacher_sessions, by = c('teacher_id','usage_date'))
+usage_classroom = left_join(classroom_info, student_usage, by = c('classroom_id','week'))
 
+
+length(unique(classroom_info$teacher_id))
 
 
 
