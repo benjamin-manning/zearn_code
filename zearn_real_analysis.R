@@ -42,32 +42,38 @@ classroom_info = classroom_info %>%
     grade_level = `Grade Level`
   )
 
+
 #1. Remove teachers with study condition NA
 classroom_info = classroom_info %>% 
   filter(!is.na(condition))
 
 #2. Remove classrooms with duplicate classroom AND teacher IDs
-teacher_class_dup = classroom_info %>%  
-  group_by(teacher_id, classroom_id) %>% 
-  summarise(count = n()) %>% 
-  filter(count >1)
-
 classroom_info = classroom_info %>% 
-  filter(!classroom_id %in% teacher_class_dup$classroom_id)
+  group_by(teacher_id, classroom_id) %>% 
+  mutate(n_dups = n()) %>% 
+  filter(n_dups == 1) %>% 
+  select(-n_dups)
 
 #3. Create indicator for teachers who 1. Did not log in to Zearn since March 
 #AND 2. had no students log in to Zearn since March  
+
 classroom_info = classroom_info %>% 
   mutate(no_log_or_student_since_march = ifelse(
     !teacher_id %in% teachers_active_sessions$`User ID (Pseudonymized)` &
     !teacher_id %in% teachers_with_active_student$`User ID (Pseudonymized)`, 1,0)
     )
+table(classroom_info)
+
+3546591 - 1
+824627 - 0
 
 #4. Create indicator for teachers who received 0 emails (invalid email address, delivery error)
 classroom_info = classroom_info %>% 
   mutate(no_emails_received = ifelse(
     !teacher_id %in% email_opens$`Lead Zearn User ID (Pseudonymized)`,1,0)
     )
+
+table(classroom_info$no_emails_received)
 
 #5. Remove classes with no students
 classroom_info = classroom_info %>% 
