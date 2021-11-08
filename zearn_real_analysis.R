@@ -1,8 +1,9 @@
 library(tidyverse)
 library(lfe)
 library(readxl)
+library(readr)
 
-setwd("~/Desktop/zearn/BCFG Main File 2021-10-18")
+setwd("C:/Users/beman/Dropbox/BCFG Zearn Mega-Study/2021 data/BCFG Main File 2021-10-18")
 
 ###############################################
 ########### DATA FRAMES AND DESCRIPTIONS ######
@@ -16,7 +17,7 @@ student_usage = read_csv('BCFG Main File - Student Usage 2021-10-18T1140.csv')
 
 classroom_info = read_csv('BCFG Main File - Teacher Classroom Info 2021-10-18T0940.csv')
 teacher_sessions = read_csv('BCFG Main File - Teacher Sessions 2021-10-18T0940.csv')
-teachers_active_sessions = read_csv('BCFG Main File - Teachers Active Since March 2021-10-18T0940.csv')
+teachers_active_sessions <- read_csv("BCFG Main File - Teachers Active Since March 2021-10-26T1056.csv")
 teachers_with_active_student = read_csv('BCFG Main File - Teachers with Students Active Since March 2021-10-18T0941.csv')
 #mindset_survey = read_excel('BCFG Mindset survey responses.xlsx')
 #report_views = read_csv('BCFG - Report Views 2021-10-18T1541.csv')
@@ -55,25 +56,47 @@ classroom_info = classroom_info %>%
   select(-n_dups)
 
 #3. Create indicator for teachers who 1. Did not log in to Zearn since March 
-#AND 2. had no students log in to Zearn since March  
-
-classroom_info = classroom_info %>% 
-  mutate(no_log_or_student_since_march = ifelse(
-    !teacher_id %in% teachers_active_sessions$`User ID (Pseudonymized)` &
-      !teacher_id %in% teachers_with_active_student$`User ID (Pseudonymized)`, 1,0)
+#AND 2. had no students log in to Zearn since March 
+teachers_active_sessions = teachers_active_sessions %>% 
+  rename(
+    teacher_id = `User ID (Pseudonymized)`
   )
-table(classroom_info)
 
-3546591 - 1
-824627 - 0
+teachers_with_active_student = teachers_with_active_student %>% 
+  rename(
+    teacher_id = `User ID (Pseudonymized)`
+  )
+
+classroom_info_teachers = data.frame(unique(classroom_info$teacher_id)) %>% 
+  rename(
+    teacher_id = unique.classroom_info.teacher_id.
+  )
+
+classroom_info_teachers = left_join(classroom_info_teachers, teachers_active_sessions, by = 'teacher_id')
+classroom_info_teachers = left_join(classroom_info_teachers, teachers_with_active_student, by = 'teacher_id')
+
+classroom_info_teachers = classroom_info_teachers %>% 
+  mutate(no_log_or_student_since_march =ifelse(
+    (!is.na(`Active Users - Total`) & !is.na(`Active Students - Total`)),1,0
+    
+  )) %>% 
+  select(teacher_id, no_log_or_student_since_march)
+
+classroom_info = left_join(classroom_info, classroom_info_teachers, by = 'teacher_id')
+table(classroom_info$no_log_or_student_since_march)
 
 #4. Create indicator for teachers who received 0 emails (invalid email address, delivery error)
-classroom_info = classroom_info %>% 
-  mutate(no_emails_received = ifelse(
-    !teacher_id %in% email_opens$`Lead Zearn User ID (Pseudonymized)`,1,0)
-  )
+email_opens = email_opens %>% 
+  rename(
+    teacher_id = `Lead Zearn User ID (Pseudonymized)`
+  ) %>% 
+  select(teacher_id) %>% 
+  mutate(no_email_received = 0)
 
-table(classroom_info$no_emails_received)
+classroom_info = left_join(classroom_info, email_opens, by = 'teacher_id')
+
+table(classroom_info$no_email_received)
+
 
 #5. Remove classes with no students
 classroom_info = classroom_info %>% 
