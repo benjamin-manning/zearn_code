@@ -89,17 +89,12 @@ classroom_info = classroom_info %>%
 table(classroom_info$no_receive_email)
 
 #5. Remove classes with no students
-classroom_info = classroom_info %>% 
-  filter(n_students > 0)
+classroom_info <- classroom_info[classroom_info$n_students > 0,]
 
 #6. Calculate number of students per teacher, create indicator for teachers with > 150 students
-students_per_teacher = classroom_info %>% 
-  group_by(teacher_id) %>% 
-  summarise(students_per_teacher = sum(n_students)) 
-
-classroom_info = left_join(classroom_info, students_per_teacher, by = 'teacher_id')
-
 classroom_info = classroom_info %>% 
+  group_by(teacher_id) %>% 
+  mutate(students_per_teacher = sum(n_students)) %>% 
   mutate(more_150_students = ifelse(
     students_per_teacher > 150,1,0
   ))
@@ -108,64 +103,76 @@ table(classroom_info$more_150_students)
 #7. Calculate number of classes per teacher, create indicator for teachers with > 6 classes
 classroom_info = classroom_info %>% 
   group_by(teacher_id) %>% 
-  mutate(class_per_teacher = n()) 
-
-classroom_info = classroom_info %>% 
+  mutate(class_per_teacher = n()) %>% 
   mutate(more_6_classes= ifelse(
-    class_per_teacher > 6,1,0
+    class_per_teacher >= 7, 1, 0
   ))
 
+table(classroom_info$more_6_classes)
 #8. Remove teachers with any of the following: 
 #indicator for did not log in and had no student log in since March (c), 
 #>150 students (e), > 6 classes f) no email delivery g) remove classes in HS+
-classroom_info = classroom_info %>% 
+classroom_info = classroom_info%>% 
   filter(no_log_or_student_since_march != 1) %>% 
-  filter(no_emails_received != 1) %>% 
+  filter(no_receive_email!=1) %>% 
   filter(more_150_students != 1) %>% 
   filter(more_6_classes != 1) %>% 
-  filter(grade_level == 'G1' |
-           grade_level == 'G2'|
-           grade_level == 'G3'|
-           grade_level == 'G4'|
-           grade_level == "G5"|
-           grade_level == "G6"|
-           grade_level == "G7"|
-           grade_level == "G8"|
-           grade_level == 'K' |
-           grade_level == 'PK')
+  filter(classroom_grade == 'G1' |
+           classroom_grade == 'G2'|
+           classroom_grade == 'G3'|
+           classroom_grade == 'G4'|
+           classroom_grade == "G5"|
+           classroom_grade == "G6"|
+           classroom_grade == "G7"|
+           classroom_grade == "G8"|
+           classroom_grade == 'K' |
+           classroom_grade == 'PK')
 
 
-#9. Calculate number of teachers per classroom, create an indicator for shared classroom
-teachers_per_class = classroom_info %>% 
-  group_by(classroom_id) %>% 
-  summarise(teachers_per_class = n())
-
-classroom_info = left_join(classroom_info, teachers_per_class, by ='classroom_id')
-
+#9. Calculate number of teachers per classroom, create an indicator for shared classroom - remove
 classroom_info = classroom_info %>% 
+  group_by(classroom_id) %>% 
+  mutate(teachers_per_class = n()) %>% 
   mutate(shared_class = ifelse(
-    classroom_info$teachers_per_class > 1, 1, 0
+    teachers_per_class > 1, 1, 0
   ))
+
+classroom_info = classroom_info[classroom_info$shared_class==0,]
 
 #10. Remove teachers with K/preK primary grade
 classroom_info = classroom_info %>% 
-  filter(`Teacher Main Grade Level` != 'K' &
-           `Teacher Main Grade Level` != 'PK')
+  filter(primary_grade != 'K' &
+           primary_grade != 'PK')
 
 #11. Remove preK/K classrooms
 classroom_info = classroom_info %>% 
-  filter(grade_level != 'K' &
-           grade_level != 'PK')
+  filter(classroom_grade != 'K' &
+           classroom_grade != 'PK')
 
+#Remove teachers with emails from multiple arms
+multi_arm_email = email_opens %>% 
+  group_by(teacher_id, folder) %>% 
+  summarise(count = n()) %>% 
+  filter(folder != 'BCFG_StudyWideMessage') %>% 
+  group_by(teacher_id) %>% 
+  summarise(count = n()) %>% 
+  rename(multi_arm_email = count) %>% 
+  mutate(multi_arm_email = multi_arm_email -1)
+
+classroom_info = left_join(classroom_info, multi_arm_email, by = 'teacher_id')
+
+classroom_info = classroom_info[classroom_info$multi_arm_email == 0,]
 
 ###########################################
 ################SECTION 2 ##################
 ###########################################
 
 #1. Create week in usage data (based on actual date)
+student_usage= read_csv('BCFG Main File - Student Usage 2021-10-18T1140.csv', col_types = list(`Classroom ID` = "c"))
+colnames(student_usage) = c('classroom_id', 'usage_date', 'total_active_students', 'sessions_per_active_student', 'mins_per_active_students',
+                            'lessons_comp_per_active_student','tower_alerts_per_active_student')
+
 student_usage = student_usage %>% 
-  rename(usage_date = `Usage Date`) %>% 
-  rename(classroom_id = `Classroom ID`) %>% 
   mutate(week = case_when(
     usage_date >=  "2021-07-14" & usage_date <= "2021-07-20" ~ -8,
     usage_date >=  "2021-07-21" & usage_date <= "2021-07-27" ~ -7,
@@ -184,41 +191,45 @@ student_usage = student_usage %>%
   )
   )
 
+table(student_usage$week)
+
+### --------------- GOOD THROUGH HERE!!
+
 #2. Create week in teacher data (-8 to 4 for each teacher)
-#joining teacher sessions with classroom
+teacher_sessions = read_csv('BCFG Main File - Teacher Sessions 2021-10-18T0940.csv', col_types = list(`User ID (Pseudonymized)` = "c"))
+
+colnames(teacher_sessions) = c("teacher_id", "usage_date", "logins")
+
 teacher_sessions = teacher_sessions %>% 
-  rename(usage_date = `Usage Date`) %>% 
-  rename(teacher_id = `User ID (Pseudonymized)`)
+  mutate(usage_date = as.Date(usage_date)) %>% 
+  mutate(week = case_when(
+    usage_date >=  "2021-07-14" & usage_date <= "2021-07-20" ~ -8,
+    usage_date >=  "2021-07-21" & usage_date <= "2021-07-27" ~ -7,
+    usage_date >=  "2021-07-28" & usage_date <= "2021-08-03" ~ -6,
+    usage_date >=  "2021-08-04" & usage_date <= "2021-08-10" ~ -5,
+    usage_date >=  "2021-08-11" & usage_date <= "2021-08-17" ~ -4,
+    usage_date >=  "2021-08-18" & usage_date <= "2021-08-24" ~ -3,
+    usage_date >=  "2021-08-25" & usage_date <= "2021-08-31" ~ -2,
+    usage_date >=  "2021-09-01" & usage_date <= "2021-09-07" ~ -1,
+    usage_date >=  "2021-09-08" & usage_date <= "2021-09-14" ~ 0,
+    usage_date >=  "2021-09-15" & usage_date <= "2021-09-21" ~ 1,
+    usage_date >=  "2021-09-22" & usage_date <= "2021-09-28" ~ 2,
+    usage_date >=  "2021-09-29" & usage_date <= "2021-10-05" ~ 3,
+    usage_date >=  "2021-10-06" & usage_date <= "2021-10-12" ~ 4
+  )
+  ) %>% 
+  filter(!is.na(week))
 
 classroom_info = left_join(teacher_sessions, classroom_info, by = 'teacher_id')
 
-classroom_info = classroom_info %>% 
-  mutate(week = case_when(
-    usage_date >=  "2021-07-14" & usage_date <= "2021-07-20" ~ -8,
-    usage_date >=  "2021-07-21" & usage_date <= "2021-07-27" ~ -7,
-    usage_date >=  "2021-07-28" & usage_date <= "2021-08-03" ~ -6,
-    usage_date >=  "2021-08-04" & usage_date <= "2021-08-10" ~ -5,
-    usage_date >=  "2021-08-11" & usage_date <= "2021-08-17" ~ -4,
-    usage_date >=  "2021-08-18" & usage_date <= "2021-08-24" ~ -3,
-    usage_date >=  "2021-08-25" & usage_date <= "2021-08-31" ~ -2,
-    usage_date >=  "2021-09-01" & usage_date <= "2021-09-07" ~ -1,
-    usage_date >=  "2021-09-08" & usage_date <= "2021-09-14" ~ 0,
-    usage_date >=  "2021-09-15" & usage_date <= "2021-09-21" ~ 1,
-    usage_date >=  "2021-09-22" & usage_date <= "2021-09-28" ~ 2,
-    usage_date >=  "2021-09-29" & usage_date <= "2021-10-05" ~ 3,
-    usage_date >=  "2021-10-06" & usage_date <= "2021-10-12" ~ 4
-    
-  )
-  )
-
-#getting rid of useless rows
-classroom_info = classroom_info %>% 
-  filter(!is.na(classroom_id))
 
 #3. Merge usage data into teacher data by class ID and week (Data now at the CLASSROOM-DAY Level)
 #merging student usage and classroom info
 
-usage_classroom = left_join(classroom_info, student_usage, by = c('classroom_id','week'))
+classroom_info = classroom_info %>% 
+  mutate(classroom_id = as.character(classroom_id))
+
+usage_classroom = left_join(classroom_info, student_usage, by = c('classroom_id','usage_date'))
 
 
 length(unique(classroom_info$teacher_id))
