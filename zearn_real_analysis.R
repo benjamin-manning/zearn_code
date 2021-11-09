@@ -95,25 +95,24 @@ classroom_info = classroom_info %>%
 #6. Calculate number of students per teacher, create indicator for teachers with > 150 students
 students_per_teacher = classroom_info %>% 
   group_by(teacher_id) %>% 
-  summarise(students_per_teacher = sum(n_student_per_class)) 
+  summarise(students_per_teacher = sum(n_students)) 
 
 classroom_info = left_join(classroom_info, students_per_teacher, by = 'teacher_id')
 
 classroom_info = classroom_info %>% 
   mutate(more_150_students = ifelse(
-    classroom_info$students_per_teacher > 150,1,0
+    students_per_teacher > 150,1,0
   ))
 
+table(classroom_info$more_150_students)
 #7. Calculate number of classes per teacher, create indicator for teachers with > 6 classes
-class_per_teacher = classroom_info %>% 
+classroom_info = classroom_info %>% 
   group_by(teacher_id) %>% 
-  summarise(class_per_teacher = n())
-
-classroom_info = left_join(classroom_info, class_per_teacher, by = 'teacher_id')
+  mutate(class_per_teacher = n()) 
 
 classroom_info = classroom_info %>% 
   mutate(more_6_classes= ifelse(
-    classroom_info$class_per_teacher > 6,1,0
+    class_per_teacher > 6,1,0
   ))
 
 #8. Remove teachers with any of the following: 
