@@ -9,40 +9,34 @@ setwd("C:/Users/beman/Dropbox/BCFG Zearn Mega-Study/2021 data/BCFG Main File 202
 ########### DATA FRAMES AND DESCRIPTIONS ######
 ###############################################
 
-# all studywide emails, what the contents was, teacher it was sent to, whether it was opened, whether it was clicked on
-email_opens = read_csv('BCFG - Email Opens 2021-10-18T1323.csv')
+# # all studywide emails, what the contents was, teacher it was sent to, whether it was opened, whether it was clicked on
+# email_opens = read_csv('BCFG - Email Opens 2021-10-18T1323.csv', col_types = list(`User ID (Pseudonymized)` = "c"))
+# 
+# #every day that a student logged in for each classroom, no zeros, must impute, keep teachers even without this data
+# student_usage = read_csv('BCFG Main File - Student Usage 2021-10-18T1140.csv')
 
-#every day that a student logged in for each classroom, no zeros, must impute, keep teachers even without this data
-student_usage = read_csv('BCFG Main File - Student Usage 2021-10-18T1140.csv')
-
-classroom_info = read_csv('BCFG Main File - Teacher Classroom Info 2021-10-18T0940.csv')
-teacher_sessions = read_csv('BCFG Main File - Teacher Sessions 2021-10-18T0940.csv')
-teachers_active_sessions <- read_csv("BCFG Main File - Teachers Active Since March 2021-10-26T1056.csv")
-teachers_with_active_student = read_csv('BCFG Main File - Teachers with Students Active Since March 2021-10-18T0941.csv')
-#mindset_survey = read_excel('BCFG Mindset survey responses.xlsx')
-#report_views = read_csv('BCFG - Report Views 2021-10-18T1541.csv')
-#qualtrics_link = read_csv('BCFG - Qualtrics Link by Teacher Pseudonymized 2021-10-18T0751.csv')
-#std_dev_usage = read_csv('BCFG Main File - Standard Deviations 2021-10-18T0943.csv')
+# classroom_info = read_csv('BCFG Main File - Teacher Classroom Info 2021-10-18T0940.csv', col_types = list(`User ID (Pseudonymized)` = "c"))
+# teacher_sessions = read_csv('BCFG Main File - Teacher Sessions 2021-10-18T0940.csv', col_types = list(`User ID (Pseudonymized)` = "c"))
+# teachers_active_sessions <- read_csv("BCFG Main File - Teachers Active Since March 2021-10-26T1056.csv", col_types = list(`User ID (Pseudonymized)` = "c"))
+# teachers_with_active_student = read_csv('BCFG Main File - Teachers with Students Active Since March 2021-10-18T0941.csv', col_types = list(`User ID (Pseudonymized)` = "c"))
+# mindset_survey = read_excel('BCFG Mindset survey responses.xlsx')
+# report_views = read_csv('BCFG - Report Views 2021-10-18T1541.csv')
+# qualtrics_link = read_csv('BCFG - Qualtrics Link by Teacher Pseudonymized 2021-10-18T0751.csv')
+# std_dev_usage = read_csv('BCFG Main File - Standard Deviations 2021-10-18T0943.csv')
 
 #LINK TO CLEANING ORDER OF OPERATIONS: https://docs.google.com/document/d/1ffOyMtP3TiNtYMq4oAQ3rfQBuc4GN93l7AmJD2EwiwM/edit
 #SEE LINK TO REFERENCE OF ALL THE OPERATIONS (IN ORDER)
 
+classroom_info = read_csv('BCFG Main File - Teacher Classroom Info 2021-10-18T0940.csv', col_types = list(`User ID (Pseudonymized)` = "c"))
+#renaming variables
+colnames(classroom_info) = c('classroom_id', 'teacher_id', 'classroom_grade', 'primary_grade',
+                             'condition', 'school_id1', 'school_id2', 
+                             'usage_prediction', "school_start", "n_students",
+                             "acct_created", "school_type", "is_charter")
 
 ###########################################
 ################SECTION 1 ##################
 ###########################################
-
-#renaming variables
-classroom_info = classroom_info %>% 
-  rename(
-    teacher_id = `User ID (Pseudonymized)`,
-    classroom_id = `Classroom ID`,
-    n_student_per_class = `Classroom Student Count`,
-    school_id = `Zearn School ID`,
-    condition = `BCFG Test Group`,
-    grade_level = `Grade Level`
-  )
-
 
 #1. Remove teachers with study condition NA
 classroom_info = classroom_info %>% 
@@ -57,50 +51,46 @@ classroom_info = classroom_info %>%
 
 #3. Create indicator for teachers who 1. Did not log in to Zearn since March 
 #AND 2. had no students log in to Zearn since March 
-teachers_active_sessions = teachers_active_sessions %>% 
-  rename(
-    teacher_id = `User ID (Pseudonymized)`
-  )
+students_active <- read_csv("BCFG Main File - Teachers with Students Active Since March 2021-10-18T0941.csv", col_types = list(`User ID (Pseudonymized)` = "c", `Active Students - Total` = "c"))
+colnames(students_active) <- c("teacher_id", "students_active")
+students_active <- students_active %>%
+  mutate(students_active = gsub(",", '',students_active)) %>%
+  mutate(students_active = as.numeric(students_active))
 
-teachers_with_active_student = teachers_with_active_student %>% 
-  rename(
-    teacher_id = `User ID (Pseudonymized)`
-  )
+teachers_active <- read_csv("BCFG Main File - Teachers Active Since March 2021-10-26T1056.csv" , col_types = list(`User ID (Pseudonymized)` = "c"))
+colnames(teachers_active) <- c("teacher_id", "teachers_active")
 
-classroom_info_teachers = data.frame(unique(classroom_info$teacher_id)) %>% 
-  rename(
-    teacher_id = unique.classroom_info.teacher_id.
-  )
+classroom_info <- left_join(classroom_info, teachers_active, by = "teacher_id") %>%
+ left_join(students_active, by = "teacher_id")
 
-classroom_info_teachers = left_join(classroom_info_teachers, teachers_active_sessions, by = 'teacher_id')
-classroom_info_teachers = left_join(classroom_info_teachers, teachers_with_active_student, by = 'teacher_id')
+classroom_info <- classroom_info %>%
+  mutate(students_active =  ifelse(is.na(students_active), 1, 0),
+         teachers_active = ifelse(is.na(teachers_active), 1, 0)) %>%
+  mutate(no_log_or_student_since_march = ifelse((students_active == 1 & teachers_active ==1), 1, 0))
 
-classroom_info_teachers = classroom_info_teachers %>% 
-  mutate(no_log_or_student_since_march =ifelse(
-    (!is.na(`Active Users - Total`) & !is.na(`Active Students - Total`)),1,0
-    
-  )) %>% 
-  select(teacher_id, no_log_or_student_since_march)
-
-classroom_info = left_join(classroom_info, classroom_info_teachers, by = 'teacher_id')
 table(classroom_info$no_log_or_student_since_march)
 
 #4. Create indicator for teachers who received 0 emails (invalid email address, delivery error)
-email_opens = email_opens %>% 
-  rename(
-    teacher_id = `Lead Zearn User ID (Pseudonymized)`
-  ) %>% 
-  select(teacher_id) %>% 
-  mutate(no_email_received = 0)
+email_opens = read_csv('BCFG - Email Opens 2021-10-18T1323.csv', col_types = list(`Lead Zearn User ID (Pseudonymized)` = "c"))
+colnames(email_opens) = c("teacher_id", "date", "folder", "email", "subject", "opened", "clicked")
 
-classroom_info = left_join(classroom_info, email_opens, by = 'teacher_id')
+email_error = email_opens %>% 
+  group_by(teacher_id) %>% 
+  summarise(count = n())
 
-table(classroom_info$no_email_received)
+classroom_info = left_join(classroom_info,email_error , by = 'teacher_id') 
 
+classroom_info = classroom_info %>% 
+  rename(no_receive_email = count) %>% 
+  mutate(no_receive_email = ifelse(
+    is.na(no_receive_email),1,0 )
+  )
+
+table(classroom_info$no_receive_email)
 
 #5. Remove classes with no students
 classroom_info = classroom_info %>% 
-  filter(n_student_per_class > 0)
+  filter(n_students > 0)
 
 #6. Calculate number of students per teacher, create indicator for teachers with > 150 students
 students_per_teacher = classroom_info %>% 
