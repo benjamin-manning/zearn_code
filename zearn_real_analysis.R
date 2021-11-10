@@ -196,32 +196,12 @@ table(student_usage$week)
 ### --------------- GOOD THROUGH HERE!!
 
 #2. Create week in teacher data (-8 to 4 for each teacher)
-teacher_sessions = read_csv('BCFG Main File - Teacher Sessions 2021-10-18T0940.csv', col_types = list(`User ID (Pseudonymized)` = "c"))
 
-colnames(teacher_sessions) = c("teacher_id", "usage_date", "logins")
+classroom_info = classroom_info %>% slice(rep(1:n(), each = 13)) 
 
-teacher_sessions = teacher_sessions %>% 
-  mutate(usage_date = as.Date(usage_date)) %>% 
-  mutate(week = case_when(
-    usage_date >=  "2021-07-14" & usage_date <= "2021-07-20" ~ -8,
-    usage_date >=  "2021-07-21" & usage_date <= "2021-07-27" ~ -7,
-    usage_date >=  "2021-07-28" & usage_date <= "2021-08-03" ~ -6,
-    usage_date >=  "2021-08-04" & usage_date <= "2021-08-10" ~ -5,
-    usage_date >=  "2021-08-11" & usage_date <= "2021-08-17" ~ -4,
-    usage_date >=  "2021-08-18" & usage_date <= "2021-08-24" ~ -3,
-    usage_date >=  "2021-08-25" & usage_date <= "2021-08-31" ~ -2,
-    usage_date >=  "2021-09-01" & usage_date <= "2021-09-07" ~ -1,
-    usage_date >=  "2021-09-08" & usage_date <= "2021-09-14" ~ 0,
-    usage_date >=  "2021-09-15" & usage_date <= "2021-09-21" ~ 1,
-    usage_date >=  "2021-09-22" & usage_date <= "2021-09-28" ~ 2,
-    usage_date >=  "2021-09-29" & usage_date <= "2021-10-05" ~ 3,
-    usage_date >=  "2021-10-06" & usage_date <= "2021-10-12" ~ 4
-  )
-  ) %>% 
-  filter(!is.na(week))
+weeks = rep(c(-8:4),169361)
 
-classroom_info = left_join(teacher_sessions, classroom_info, by = 'teacher_id')
-
+classroom_info$week = weeks
 
 #3. Merge usage data into teacher data by class ID and week (Data now at the CLASSROOM-DAY Level)
 #merging student usage and classroom info
@@ -229,12 +209,11 @@ classroom_info = left_join(teacher_sessions, classroom_info, by = 'teacher_id')
 classroom_info = classroom_info %>% 
   mutate(classroom_id = as.character(classroom_id))
 
-usage_classroom = left_join(classroom_info, student_usage, by = c('classroom_id','usage_date'))
-
-
-length(unique(classroom_info$teacher_id))
-
-
+student_usage = student_usage %>% 
+  mutate(classroom_id = as.character(classroom_id))
+        
+         
+classroom_info = left_join(classroom_info, student_usage, by = c('classroom_id', 'week'))
 
 
 
