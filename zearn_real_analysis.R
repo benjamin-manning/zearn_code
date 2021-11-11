@@ -167,12 +167,17 @@ classroom_info = classroom_info[classroom_info$multi_arm_email == 0,]
 ################SECTION 2 ##################
 ###########################################
 
+saver = classroom_info
+#classroom_info =saver
+
 #1. Create week in usage data (based on actual date)
 student_usage= read_csv('BCFG Main File - Student Usage 2021-10-18T1140.csv', col_types = list(`Classroom ID` = "c"))
-colnames(student_usage) = c('classroom_id', 'usage_date', 'total_active_students', 'sessions_per_active_student', 'mins_per_active_students',
-                            'lessons_comp_per_active_student','tower_alerts_per_active_student')
+colnames(student_usage) = c('classroom_id', 'usage_date', 'total_active_students', 'logins_per_active_student', 'mins_per_active_students',
+                            'badgesp_per_active_student','tower_alerts_per_active_student')
 
-student_usage = student_usage %>% 
+
+
+student_usage = student_usage %>%
   mutate(week = case_when(
     usage_date >=  "2021-07-14" & usage_date <= "2021-07-20" ~ -8,
     usage_date >=  "2021-07-21" & usage_date <= "2021-07-27" ~ -7,
@@ -186,36 +191,52 @@ student_usage = student_usage %>%
     usage_date >=  "2021-09-15" & usage_date <= "2021-09-21" ~ 1,
     usage_date >=  "2021-09-22" & usage_date <= "2021-09-28" ~ 2,
     usage_date >=  "2021-09-29" & usage_date <= "2021-10-05" ~ 3,
-    usage_date >=  "2021-10-06" & usage_date <= "2021-10-12" ~ 4
-    
+    usage_date >=  "2021-10-06" & usage_date <= "2021-10-12" ~ 4)
   )
-  )
+
+#2. remove weeks outside of -8 and 4
+
+student_usage = student_usage %>% 
+   filter(!is.na(week))
 
 table(student_usage$week)
 
 ### --------------- GOOD THROUGH HERE!!
 
-#2. Create week in teacher data (-8 to 4 for each teacher)
+#3. Create week in teacher data (-8 to 4 for each teacher)
 
-classroom_info = classroom_info %>% slice(rep(1:n(), each = 13)) 
+classroom_day = classroom_info %>% slice(rep(1:n(), each = 13)) 
 
-weeks = rep(c(-8:4),169361)
+classroom_day <- classroom_day %>%
+  arrange(teacher_id)
 
-classroom_info$week = weeks
+classroom_day$week = rep(c(-8:4), dim(classroom_info)[1])
 
-#3. Merge usage data into teacher data by class ID and week (Data now at the CLASSROOM-DAY Level)
+
+#4. Merge usage data into teacher data by class ID and week (Data now at the CLASSROOM-DAY Level)
 #merging student usage and classroom info
 
-classroom_info = classroom_info %>% 
+classroom_day = classroom_day %>% 
   mutate(classroom_id = as.character(classroom_id))
 
 student_usage = student_usage %>% 
   mutate(classroom_id = as.character(classroom_id))
         
          
-classroom_info = left_join(classroom_info, student_usage, by = c('classroom_id', 'week'))
+classroom_day_usage = left_join(classroom_day, student_usage, by = c('classroom_id', 'week'))
 
+#5. Calculate total badges for each row (=active students X badges per active students)
+classroom_day_usage = classroom_day_usage %>% 
+  mutate(total_badges_per_class_per_day = total_active_students*badgesp_per_active_student)
 
+summary(classroom_day_usage$total_badges_per_class_per_day)
+
+#6. Calculate students for each teacher
+#I think this is already done? doing for active:
+
+classroom_day_usage = classroom_day_usage %>% 
+  group_by(teacher_id) %>% 
+  mutate(active_student_per_teacher = sum(total_active_students))
 
 
 
