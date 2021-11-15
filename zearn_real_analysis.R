@@ -16,7 +16,7 @@ setwd("C:/Users/beman/Dropbox/BCFG Zearn Mega-Study/2021 data/BCFG Main File 202
 # student_usage = read_csv('BCFG Main File - Student Usage 2021-10-18T1140.csv')
 
 # classroom_info = read_csv('BCFG Main File - Teacher Classroom Info 2021-10-18T0940.csv', col_types = list(`User ID (Pseudonymized)` = "c"))
-# teacher_sessions = read_csv('BCFG Main File - Teacher Sessions 2021-10-18T0940.csv', col_types = list(`User ID (Pseudonymized)` = "c"))
+teacher_sessions = read_csv('BCFG Main File - Teacher Sessions 2021-10-18T0940.csv', col_types = list(`User ID (Pseudonymized)` = "c"))
 # teachers_active_sessions <- read_csv("BCFG Main File - Teachers Active Since March 2021-10-26T1056.csv", col_types = list(`User ID (Pseudonymized)` = "c"))
 # teachers_with_active_student = read_csv('BCFG Main File - Teachers with Students Active Since March 2021-10-18T0941.csv', col_types = list(`User ID (Pseudonymized)` = "c"))
 # mindset_survey = read_excel('BCFG Mindset survey responses.xlsx')
@@ -38,18 +38,18 @@ colnames(classroom_info) = c('classroom_id', 'teacher_id', 'classroom_grade', 'p
 ################SECTION 1 ##################
 ###########################################
 
-#1. Remove teachers with study condition NA
+#1.1 Remove teachers with study condition NA
 classroom_info = classroom_info %>% 
   filter(!is.na(condition))
 
-#2. Remove classrooms with duplicate classroom AND teacher IDs
+#1.2 Remove classrooms with duplicate classroom AND teacher IDs
 classroom_info = classroom_info %>% 
   group_by(teacher_id, classroom_id) %>% 
   mutate(n_dups = n()) %>% 
   filter(n_dups == 1) %>% 
   select(-n_dups)
 
-#3. Create indicator for teachers who 1. Did not log in to Zearn since March 
+#1.3 Create indicator for teachers who 1. Did not log in to Zearn since March 
 #AND 2. had no students log in to Zearn since March 
 students_active <- read_csv("BCFG Main File - Teachers with Students Active Since March 2021-10-18T0941.csv", col_types = list(`User ID (Pseudonymized)` = "c", `Active Students - Total` = "c"))
 colnames(students_active) <- c("teacher_id", "students_active")
@@ -70,7 +70,7 @@ classroom_info <- classroom_info %>%
 
 table(classroom_info$no_log_or_student_since_march)
 
-#4. Create indicator for teachers who received 0 emails (invalid email address, delivery error)
+#1.4 Create indicator for teachers who received 0 emails (invalid email address, delivery error)
 email_opens = read_csv('BCFG - Email Opens 2021-10-18T1323.csv', col_types = list(`Lead Zearn User ID (Pseudonymized)` = "c"))
 colnames(email_opens) = c("teacher_id", "date", "folder", "email", "subject", "opened", "clicked")
 
@@ -88,10 +88,10 @@ classroom_info = classroom_info %>%
 
 table(classroom_info$no_receive_email)
 
-#5. Remove classes with no students
+#1.5 Remove classes with no students
 classroom_info <- classroom_info[classroom_info$n_students > 0,]
 
-#6. Calculate number of students per teacher, create indicator for teachers with > 150 students
+#1.6 Calculate number of students per teacher, create indicator for teachers with > 150 students
 classroom_info = classroom_info %>% 
   group_by(teacher_id) %>% 
   mutate(students_per_teacher = sum(n_students)) %>% 
@@ -100,7 +100,8 @@ classroom_info = classroom_info %>%
   ))
 
 table(classroom_info$more_150_students)
-#7. Calculate number of classes per teacher, create indicator for teachers with > 6 classes
+
+#1.7 Calculate number of classes per teacher, create indicator for teachers with > 6 classes
 classroom_info = classroom_info %>% 
   group_by(teacher_id) %>% 
   mutate(class_per_teacher = n()) %>% 
@@ -109,7 +110,14 @@ classroom_info = classroom_info %>%
   ))
 
 table(classroom_info$more_6_classes)
-#8. Remove teachers with any of the following: 
+
+#1.8 Identify Teachers with high school classrooms
+##NEED TO DO AFTER CONVO ON 11/15
+
+#1.9 add indicator for whether a classroom has overlapping students with another classroom in the current data set
+##NEED TO DO AFTER CONVO ON 11/15
+
+#1.10 Remove teachers with any of the following: 
 #indicator for did not log in and had no student log in since March (c), 
 #>150 students (e), > 6 classes f) no email delivery g) remove classes in HS+
 classroom_info = classroom_info%>% 
@@ -129,7 +137,7 @@ classroom_info = classroom_info%>%
            classroom_grade == 'PK')
 
 
-#9. Calculate number of teachers per classroom, create an indicator for shared classroom - remove
+#1.11 Calculate number of teachers per classroom, create an indicator for shared classroom
 classroom_info = classroom_info %>% 
   group_by(classroom_id) %>% 
   mutate(teachers_per_class = n()) %>% 
@@ -137,19 +145,20 @@ classroom_info = classroom_info %>%
     teachers_per_class > 1, 1, 0
   ))
 
+#1.12 remove shared classrooms
 classroom_info = classroom_info[classroom_info$shared_class==0,]
 
-#10. Remove teachers with K/preK primary grade
+#1.13 Remove teachers with K/preK primary grade
 classroom_info = classroom_info %>% 
   filter(primary_grade != 'K' &
            primary_grade != 'PK')
 
-#11. Remove preK/K classrooms
+#1.14 Remove preK/K classrooms
 classroom_info = classroom_info %>% 
   filter(classroom_grade != 'K' &
            classroom_grade != 'PK')
 
-#Remove teachers with emails from multiple arms
+#1.15 Remove teachers with emails from multiple arms
 multi_arm_email = email_opens %>% 
   group_by(teacher_id, folder) %>% 
   summarise(count = n()) %>% 
@@ -163,6 +172,11 @@ classroom_info = left_join(classroom_info, multi_arm_email, by = 'teacher_id')
 
 classroom_info = classroom_info[classroom_info$multi_arm_email == 0,]
 
+#1.16 Recalculate number of students and number of classrooms for the regression
+# need to do after convo on 11/15
+
+
+
 ###########################################
 ################SECTION 2 ##################
 ###########################################
@@ -170,8 +184,8 @@ classroom_info = classroom_info[classroom_info$multi_arm_email == 0,]
 saver = classroom_info
 #classroom_info =saver
 
-#1. Create week in usage data (based on actual date)
-student_usage= read_csv('BCFG Main File - Student Usage 2021-10-18T1140.csv', col_types = list(`Classroom ID` = "c"))
+#2.1 Create week in usage data (based on actual date)
+student_usage = read_csv('BCFG Main File - Student Usage 2021-10-18T1140.csv', col_types = list(`Classroom ID` = "c"))
 colnames(student_usage) = c('classroom_id', 'usage_date', 'total_active_students', 'logins_per_active_student', 'mins_per_active_students',
                             'badgesp_per_active_student','tower_alerts_per_active_student')
 
@@ -194,7 +208,7 @@ student_usage = student_usage %>%
     usage_date >=  "2021-10-06" & usage_date <= "2021-10-12" ~ 4)
   )
 
-#2. remove weeks outside of -8 and 4
+#2.2 remove weeks outside of -8 and 4
 
 student_usage = student_usage %>% 
    filter(!is.na(week))
@@ -203,7 +217,7 @@ table(student_usage$week)
 
 ### --------------- GOOD THROUGH HERE!!
 
-#3. Create week in teacher data (-8 to 4 for each teacher)
+#2.3 Create week in teacher data (-8 to 4 for each teacher)
 
 classroom_day = classroom_info %>% slice(rep(1:n(), each = 13)) 
 
@@ -213,7 +227,7 @@ classroom_day <- classroom_day %>%
 classroom_day$week = rep(c(-8:4), dim(classroom_info)[1])
 
 
-#4. Merge usage data into teacher data by class ID and week (Data now at the CLASSROOM-DAY Level)
+#2.4 Merge usage data into teacher data by class ID and week (Data now at the CLASSROOM-DAY Level)
 #merging student usage and classroom info
 
 classroom_day = classroom_day %>% 
@@ -222,12 +236,18 @@ classroom_day = classroom_day %>%
 student_usage = student_usage %>% 
   mutate(classroom_id = as.character(classroom_id))
         
-         
+
+### BEN'S DATA DIFFERS HERE!
 classroom_day_usage = left_join(classroom_day, student_usage, by = c('classroom_id', 'week'))
+
+write.csv(student_usage, "student_usage.csv")
+write.csv(classroom_day, "classroom_day.csv")
+write.csv(classroom_day, "classroom_day_usage.csv")
+############### 
 
 #5. Calculate total badges for each row (=active students X badges per active students)
 classroom_day_usage = classroom_day_usage %>% 
-  mutate(total_badges_per_class_per_day = total_active_students*badgesp_per_active_student)
+  mutate(total_badges_per_class_per_day = n_students*badges_per_active_student)
 
 summary(classroom_day_usage$total_badges_per_class_per_day)
 
