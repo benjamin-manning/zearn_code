@@ -242,7 +242,7 @@ classroom_day_usage = left_join(classroom_day, student_usage, by = c('classroom_
 
 write.csv(student_usage, "student_usage.csv")
 write.csv(classroom_day, "classroom_day.csv")
-write.csv(classroom_day, "classroom_day_usage.csv")
+write.csv(classroom_day_usage, "classroom_day_usage.csv")
 ############### 
 
 #5. Calculate total badges for each row (=active students X badges per active students)
