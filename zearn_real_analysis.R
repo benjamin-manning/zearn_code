@@ -16,7 +16,7 @@ setwd("C:/Users/beman/Dropbox/BCFG Zearn Mega-Study/2021 data/BCFG Main File 202
 # student_usage = read_csv('BCFG Main File - Student Usage 2021-10-18T1140.csv')
 
 # classroom_info = read_csv('BCFG Main File - Teacher Classroom Info 2021-10-18T0940.csv', col_types = list(`User ID (Pseudonymized)` = "c"))
-teacher_sessions = read_csv('BCFG Main File - Teacher Sessions 2021-10-18T0940.csv', col_types = list(`User ID (Pseudonymized)` = "c"))
+#teacher_sessions = read_csv('BCFG Main File - Teacher Sessions 2021-10-18T0940.csv', col_types = list(`User ID (Pseudonymized)` = "c"))
 # teachers_active_sessions <- read_csv("BCFG Main File - Teachers Active Since March 2021-10-26T1056.csv", col_types = list(`User ID (Pseudonymized)` = "c"))
 # teachers_with_active_student = read_csv('BCFG Main File - Teachers with Students Active Since March 2021-10-18T0941.csv', col_types = list(`User ID (Pseudonymized)` = "c"))
 # mindset_survey = read_excel('BCFG Mindset survey responses.xlsx')
@@ -101,6 +101,8 @@ classroom_info = classroom_info %>%
 
 table(classroom_info$more_150_students)
 
+#classroom_info[is.na(classroom_info$more_150_students), ]
+
 #1.7 Calculate number of classes per teacher, create indicator for teachers with > 6 classes
 classroom_info = classroom_info %>% 
   group_by(teacher_id) %>% 
@@ -109,13 +111,51 @@ classroom_info = classroom_info %>%
     class_per_teacher >= 7, 1, 0
   ))
 
+#classroom_info[is.na(classroom_info$more_6_classes), ]
+
 table(classroom_info$more_6_classes)
 
 #1.8 Identify Teachers with high school classrooms
 ##NEED TO DO AFTER CONVO ON 11/15
 
+classroom_info = classroom_info %>% 
+  mutate(high_school = case_when(
+    classroom_grade == 'G12'~ 1,
+    classroom_grade == 'G11'~ 1,
+    classroom_grade == 'G10'~ 1,
+    classroom_grade == 'G9'~ 1,
+    classroom_grade == 'Post-HS'~ 1
+  )) %>% 
+  mutate(high_school = ifelse(is.na(high_school), 0, high_school))
+
+table(classroom_info$high_school)
+
 #1.9 add indicator for whether a classroom has overlapping students with another classroom in the current data set
-##NEED TO DO AFTER CONVO ON 11/15
+overlaps <- read_csv("2021-10-29-classroom-overlaps-for-bcfg.csv",col_types = list(classroom_1_id = "c"))
+
+overlaps1 = data.frame(unique(overlaps$classroom_1_id)) %>% 
+  rename(classroom_id = unique.overlaps.classroom_1_id.) %>% 
+  mutate(overlap1 = 1)
+
+overlaps2 = data.frame(unique(overlaps$classroom_2_id)) %>% 
+  rename(classroom_id = unique.overlaps.classroom_2_id.) %>% 
+  mutate(overlap2 = 1) %>% 
+  mutate(classroom_id = as.character(classroom_id))
+
+classroom_info = classroom_info %>% 
+  mutate(classroom_id = as.character(classroom_id))
+
+classroom_info = left_join(classroom_info, overlaps1, by = c('classroom_id'))
+classroom_info = left_join(classroom_info, overlaps2, by = c('classroom_id'))
+
+classroom_info = classroom_info %>% 
+  mutate(overlapping_classroom = case_when(
+    overlap1 == 1 ~ 1,
+    overlap2 == 1 ~ 1,
+    is.na(overlap1) & is.na(overlap2) ~ 0
+  ))
+
+table(classroom_info$overlapping_classroom)
 
 #1.10 Remove teachers with any of the following: 
 #indicator for did not log in and had no student log in since March (c), 
@@ -170,12 +210,25 @@ multi_arm_email = email_opens %>%
 
 classroom_info = left_join(classroom_info, multi_arm_email, by = 'teacher_id')
 
-classroom_info = classroom_info[classroom_info$multi_arm_email == 0,]
+classroom_info = classroom_info %>% 
+  filter(multi_arm_email == 0 | is.na(multi_arm_email)) %>% 
+  mutate(multi_arm_email = 0)
 
 #1.16 Recalculate number of students and number of classrooms for the regression
 # need to do after convo on 11/15
+classroom_info = classroom_info %>% 
+  group_by(teacher_id) %>% 
+  mutate(students_per_teacher_post_excl = sum(n_students))
 
+summary(classroom_info$students_per_teacher)
+summary(classroom_info$students_per_teacher_post_excl)
 
+classroom_info = classroom_info %>% 
+  group_by(teacher_id) %>% 
+  mutate(class_per_teacher_post_excl = n())
+
+summary(classroom_info$class_per_teacher)
+summary(classroom_info$class_per_teacher_post_excl)
 
 ###########################################
 ################SECTION 2 ##################
@@ -187,7 +240,7 @@ saver = classroom_info
 #2.1 Create week in usage data (based on actual date)
 student_usage = read_csv('BCFG Main File - Student Usage 2021-10-18T1140.csv', col_types = list(`Classroom ID` = "c"))
 colnames(student_usage) = c('classroom_id', 'usage_date', 'total_active_students', 'logins_per_active_student', 'mins_per_active_students',
-                            'badgesp_per_active_student','tower_alerts_per_active_student')
+                            'badges_per_active_student','tower_alerts_per_active_student')
 
 
 
@@ -236,27 +289,62 @@ classroom_day = classroom_day %>%
 student_usage = student_usage %>% 
   mutate(classroom_id = as.character(classroom_id))
         
-
-### BEN'S DATA DIFFERS HERE!
 classroom_day_usage = left_join(classroom_day, student_usage, by = c('classroom_id', 'week'))
 
-write.csv(student_usage, "student_usage.csv")
-write.csv(classroom_day, "classroom_day.csv")
-write.csv(classroom_day_usage, "classroom_day_usage.csv")
-############### 
+#2.5 using the overlaps file, create an indicator for whether eligible classrooms overlap with other eligible classrooms. Both classrooms must be in data set for indicator to be 1
 
-#5. Calculate total badges for each row (=active students X badges per active students)
+
+classroom_day_usage$overlap1 = ifelse(is.na(classroom_day_usage$overlap1),0,classroom_day_usage$overlap1)
+classroom_day_usage$overlap2 = ifelse(is.na(classroom_day_usage$overlap2),0,classroom_day_usage$overlap2)
+
+classroom_day_usage$eligible_overlaps = ifelse(classroom_day_usage$overlap1 == 1 & classroom_day_usage$overlap2 == 1, 1,0)
+
+table(classroom_day_usage$eligible_overlaps)
+
+#2.6 Calculate total badges for each row (=active students X badges per active students)
 classroom_day_usage = classroom_day_usage %>% 
-  mutate(total_badges_per_class_per_day = n_students*badges_per_active_student)
+  mutate(total_badges_per_class_per_day_active = total_active_students*badges_per_active_student)
 
-summary(classroom_day_usage$total_badges_per_class_per_day)
+summary(classroom_day_usage$total_badges_per_class_per_day_active)
 
-#6. Calculate students for each teacher
-#I think this is already done? doing for active:
+#2.7 calculate total badges per student for each row
 
 classroom_day_usage = classroom_day_usage %>% 
-  group_by(teacher_id) %>% 
-  mutate(active_student_per_teacher = sum(total_active_students))
+  mutate(total_badges_per_class_per_day_total = total_badges_per_class_per_day_active/students_per_teacher_post_excl)
+
+summary(classroom_day_usage$total_badges_per_class_per_day_total)
+
+#2.8 For badges per student when school start date isn't missing, turn some into NAs 
+#before first full week of class and turn NAs to 0 after school start date
+
+#2.8.1 For schools with missing start date, all NA DV data should be 0
+#2.8.2 Baseline data starts on the first full week
+
+classroom_day_usage$total_badges_per_class_per_day_total = 
+  ifelse(is.na(classroom_day_usage$total_badges_per_class_per_day_total) & is.na(classroom_day_usage$school_start), 
+         0,
+         classroom_day_usage$total_badges_per_class_per_day_total)
+
+summary(classroom_day_usage$total_badges_per_class_per_day_total)
+
+
+classroom_day_usage$total_badges_per_class_per_day_total = 
+  ifelse(is.na(classroom_day_usage$total_badges_per_class_per_day_total) & 
+           !is.na(classroom_day_usage$school_start) & 
+           classroom_day_usage$usage_date > classroom_day_usage$school_start, 
+         0,
+         classroom_day_usage$total_badges_per_class_per_day_total)
+
+summary(classroom_day_usage$total_badges_per_class_per_day_total)
+
+#2.9 group by week and sum badges per student by week (data will now be at classroom week level)
+
+classroom_week_usage = classroom_day_usage %>% 
+  group_by(classroom_id,week) %>% 
+  summarize(badges_per_student_per_week = sum(total_badges_per_class_per_day_total))
+
+summary(classroom_week_usage$badges_per_student_per_week)
+
 
 
 
