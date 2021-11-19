@@ -14,9 +14,9 @@ setwd("C:/Users/beman/Dropbox/BCFG Zearn Mega-Study/2021 data/BCFG Main File 202
 # 
 # #every day that a student logged in for each classroom, no zeros, must impute, keep teachers even without this data
 # student_usage = read_csv('BCFG Main File - Student Usage 2021-10-18T1140.csv')
-
+# 
 # classroom_info = read_csv('BCFG Main File - Teacher Classroom Info 2021-10-18T0940.csv', col_types = list(`User ID (Pseudonymized)` = "c"))
-#teacher_sessions = read_csv('BCFG Main File - Teacher Sessions 2021-10-18T0940.csv', col_types = list(`User ID (Pseudonymized)` = "c"))
+# teacher_sessions = read_csv('BCFG Main File - Teacher Sessions 2021-10-18T0940.csv', col_types = list(`User ID (Pseudonymized)` = "c"))
 # teachers_active_sessions <- read_csv("BCFG Main File - Teachers Active Since March 2021-10-26T1056.csv", col_types = list(`User ID (Pseudonymized)` = "c"))
 # teachers_with_active_student = read_csv('BCFG Main File - Teachers with Students Active Since March 2021-10-18T0941.csv', col_types = list(`User ID (Pseudonymized)` = "c"))
 # mindset_survey = read_excel('BCFG Mindset survey responses.xlsx')
@@ -87,6 +87,33 @@ classroom_info = classroom_info %>%
   )
 
 table(classroom_info$no_receive_email)
+
+#1.5 Reshape the current dataset using overlaps data - where classroom_1_student_count = classroom_2_student_count = count_of_students_shared, 
+#and where both classrooms have the same teacher_id, we consider these duplicates. Instead of duplicate classrooms spanning multiple rows, 
+#we add each duplicate ID to new columns: classroom_2_id, classroom_3_id, ., classroom_n_id, and then remove redundant rows in which there
+#is only the duplicate
+overlaps <- read_csv("2021-10-29-classroom-overlaps-for-bcfg.csv",col_types = list(classroom_1_id = "c"))
+
+overlaps = overlaps %>% 
+  filter(classroom_1_student_count == classroom_2_student_count) %>% 
+  filter(classroom_2_student_count == count_of_students_shared) %>% 
+  select(-...1, -classroom_1_subject, -classroom_2_subject) %>% 
+  mutate(classroom_1_id = as.character(classroom_1_id)) %>% 
+  mutate(classroom_2_id = as.character(classroom_2_id))
+
+teacher_classroom_list = classroom_info %>% 
+  select(classroom_id,teacher_id) %>%
+  mutate(classroom_id = as.character(classroom_id))
+
+overlaps = left_join(overlaps, teacher_classroom_list, by = c("classroom_1_id" = 'classroom_id'))
+overlaps = left_join(overlaps, teacher_classroom_list, by = c("classroom_2_id" = 'classroom_id'),suffix = c("_1", "_2"))
+
+overlaps = overlaps %>% 
+  filter(!is.na(teacher_id_1)) %>% 
+  filter(teacher_id_1 == teacher_id_2)
+
+#______________________________ DONE THROUGH HERE!
+
 
 #1.5 Remove classes with no students
 classroom_info <- classroom_info[classroom_info$n_students > 0,]
@@ -316,6 +343,24 @@ summary(classroom_day_usage$total_badges_per_class_per_day_total)
 
 #2.8 For badges per student when school start date isn't missing, turn some into NAs 
 #before first full week of class and turn NAs to 0 after school start date
+
+
+# #replacing missing pre_logins with 0
+# 
+# teachers_with_dv[,"pre_logins"][is.na(teachers_with_dv[,"pre_logins"])] <- 0
+# 
+# #filling in data with missing school start date
+# teachers_with_dv <- teachers_with_dv %>%
+#   mutate(across(all_of(numeric), ~replace(., is.na(school_start) & is.na(.), 0)))
+# 
+# #setting dv data to NA if before school start date, NA to 0 if after
+# 
+# teachers_with_dv <- teachers_with_dv %>%
+#   mutate(across(all_of(numeric), ~replace(., first_full_week > week, NA)))
+# 
+# teachers_with_dv <- teachers_with_dv %>%
+#   mutate(across(all_of(numeric), ~replace(., first_full_week <= week & is.na(.), 0)))
+
 
 #2.8.1 For schools with missing start date, all NA DV data should be 0
 #2.8.2 Baseline data starts on the first full week
