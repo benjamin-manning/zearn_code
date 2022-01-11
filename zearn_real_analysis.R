@@ -3,7 +3,11 @@ library(lfe)
 library(readxl)
 library(readr)
 
+#for PC
 setwd("C:/Users/beman/Dropbox/BCFG Zearn Mega-Study/2021 data/BCFG Main File 2021-10-18")
+
+#for max
+setwd("/Users/benjaminmanning/Dropbox/BCFG Zearn Mega-Study/2021 data/BCFG Main File 2021-10-18")
 
 ###############################################
 ########### DATA FRAMES AND DESCRIPTIONS ######
@@ -13,7 +17,7 @@ setwd("C:/Users/beman/Dropbox/BCFG Zearn Mega-Study/2021 data/BCFG Main File 202
 # email_opens = read_csv('BCFG - Email Opens 2021-10-18T1323.csv', col_types = list(`User ID (Pseudonymized)` = "c"))
 # 
 # #every day that a student logged in for each classroom, no zeros, must impute, keep teachers even without this data
-# student_usage = read_csv('BCFG Main File - Student Usage 2021-10-18T1140.csv')
+student_usage = read_csv('BCFG Main File - Student Usage 2021-10-18T1140.csv')
 # 
 # classroom_info = read_csv('BCFG Main File - Teacher Classroom Info 2021-10-18T0940.csv', col_types = list(`User ID (Pseudonymized)` = "c"))
 # teacher_sessions = read_csv('BCFG Main File - Teacher Sessions 2021-10-18T0940.csv', col_types = list(`User ID (Pseudonymized)` = "c"))
